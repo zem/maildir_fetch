@@ -3,36 +3,53 @@ use Maildir;
 
 # line length
 my $llen=76;
-my $hdrname="X-Rcpt-To:"
+my $hdrname="X-Rcpt-To";
 
 $md=Maildir->new(dir=>shift(@ARGV));
+
+my @ADDRS=@ARGV; 
 
 # handling line breaks for rfc822 is a bit awful 
 sub rcpt_hdr {
 	my $cutdata=shift; 
 	my $hdr="\n	"; 
-	if ( ! $cutdata ) { $hdr=$hdrname; }
-	while ( my $addr=shift(@ARGV) ) {
-		if (length($hdr." ".$addr) >= $llen) {
-			# ok lets linebreak this we have two cases 
-			if ($hdr==$hdrname) {
+	my $space=""; 
+	if ( ! $cutdata ) { 
+		$hdr=$hdrname.": "; 
+	} else {
+		@ADDRS=($cutdata, @ADDRS); 
+	}
+	# für jede adresse im parameter 
+	while ( my $addr=shift(@ADDRS) ) {
+		#auf überlänge prüfen
+		#print length($hdr.$space.$addr)." ".$llen."\n";
+		if (length($hdr.$space.$addr) >= $llen) {
+			# ok lets linebreak this we have two cases
+			if ( ($hdr eq $hdrname) or ($hdr eq "\n	")) {
 				# data cant be splitted
 				# but this will never happen but it could 
-				$hdr=$hdr." ".$addr; 
+				#print "superlongline $hdr -- $addr \n";
+				$hdr=$hdr.$space.$addr; 
 				$hdr=substr($hdr, 0, $llen).rcpt_hdr(substr($hdr, $llen));
 			} else {
 				# data can be splitted so we will make 
 				# a linebreak
-				$hdr=$hdr." ".rcpt_hdr(substr($addr); 
+				#print "longline $hdr -- $addr \n";
+				$hdr=$hdr.$space.rcpt_hdr($addr); 
 			}
+		} else {
+			#print "data $addr \n";
+			$hdr=$hdr.$space.$addr; 
 		}
+		$space=" ";
 	}
-	return $hdr."\n";
+	print $hdr."\n";
+	return $hdr;
 }
 
 my $msg='';
 while(<STDIN>){ $msg.=$_; }
 
 if ( ! $msg ) { die "No Message on stdin\n"; }
-$md->add_msg(rcpt_hdr().$msg);
+$md->add_msg(rcpt_hdr()."\n".$msg);
 
